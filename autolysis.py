@@ -13,7 +13,6 @@
 # description = "A script to analyze datasets dynamically and generate visualizations, summaries, and insights."
 # ///
 
-
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -104,6 +103,8 @@ def analyze_correlation(df):
         sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", fmt=".2f")
         save_visualization(plt, "correlation_heatmap.png")
         return corr_matrix
+    else:
+        print("No numeric columns for correlation analysis.")
     return None
 
 # Clustering with Visualization
@@ -128,6 +129,8 @@ def perform_clustering(df):
         plt.title(f"KMeans Clustering (Silhouette Score: {silhouette_avg:.2f})")
         save_visualization(plt, "clustering.png")
         return silhouette_avg
+    else:
+        print("Not enough numeric columns for clustering.")
     return None
 
 # Generate README
@@ -165,7 +168,7 @@ def analyze_data(file_path):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python autolysis.py <dataset1.csv> [<dataset2.csv>]")
+        print("Usage: python autolysis.py <dataset1.csv> [<dataset2.csv> ...]")
         sys.exit(1)
 
     datasets = sys.argv[1:]
