@@ -1,15 +1,18 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "chardet",
-#   "matplotlib",
-#   "numpy",
 #   "pandas",
-#   "requests",
+#   "numpy",
+#   "matplotlib",
 #   "seaborn",
 #   "scikit-learn",
+#   "chardet",
+#   "requests",
 # ]
+# usage = "python autolysis.py <dataset1.csv> [<dataset2.csv> ...]"
+# description = "A script to analyze datasets dynamically and generate visualizations, summaries, and insights."
 # ///
+
 
 import os
 import pandas as pd
