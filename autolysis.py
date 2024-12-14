@@ -10,11 +10,14 @@
 #   "scikit-learn",
 # ]
 # ///
+
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import silhouette_score
 import numpy as np
 import chardet
@@ -31,7 +34,7 @@ CONFIG = {
 # Ensure the output directory exists
 os.makedirs(CONFIG["OUTPUT_DIR"], exist_ok=True)
 
-# Function to interact with LLM via AI Proxy
+# LLM Interaction Function
 def ask_llm(question, context):
     try:
         headers = {"Authorization": f"Bearer {CONFIG['AIPROXY_TOKEN']}", "Content-Type": "application/json"}
@@ -41,58 +44,56 @@ def ask_llm(question, context):
         }
         response = requests.post(CONFIG["AI_PROXY_URL"], headers=headers, json=payload)
         response.raise_for_status()
-        response_json = response.json()
-        return response_json['choices'][0]['message']['content']
-    except requests.exceptions.RequestException as e:
-        print(f"Error communicating with AI Proxy: {e}")
-        sys.exit(1)
-
-# Function to save visualizations
-def visualization(plt, file_name):
-    try:
-        plt.tight_layout()
-        plt.savefig(os.path.join(CONFIG["OUTPUT_DIR"], file_name), bbox_inches="tight")
-        plt.close()
+        return response.json()["choices"][0]["message"]["content"]
     except Exception as e:
-        print(f"Error saving visualization {file_name}: {e}")
+        print(f"Error interacting with LLM: {e}")
+        return "LLM interaction failed."
 
-# Function to detect encoding
+# Save Visualization Helper
+def save_visualization(plt_obj, filename):
+    try:
+        plt_obj.tight_layout()
+        file_path = os.path.join(CONFIG["OUTPUT_DIR"], filename)
+        plt_obj.savefig(file_path, bbox_inches="tight")
+        plt_obj.close()
+        return file_path
+    except Exception as e:
+        print(f"Error saving visualization: {e}")
+        return None
+
+# Detect File Encoding
 def detect_encoding(file_path):
-    try:
-        with open(file_path, 'rb') as f:
-            raw_data = f.read()
-        result = chardet.detect(raw_data)
-        return result['encoding']
-    except Exception as e:
-        print(f"Error detecting file encoding: {e}")
-        sys.exit(1)
+    with open(file_path, "rb") as f:
+        raw_data = f.read()
+    return chardet.detect(raw_data)["encoding"]
 
-# Function to perform missing data analysis
+# Missing Data Analysis
 def analyze_missing_data(df):
     missing_data = df.isnull().sum()
     missing_percent = (missing_data / len(df)) * 100
     missing_summary = missing_percent[missing_percent > 0].sort_values(ascending=False)
+
     if not missing_summary.empty:
         plt.figure(figsize=(10, 6))
-        missing_summary.plot(kind="bar", color="skyblue")
-        plt.title("Percentage of Missing Data by Column")
+        missing_summary.plot(kind="bar", color="salmon")
+        plt.title("Missing Data by Column")
         plt.ylabel("Percentage")
-        visualization(plt, "missing_data.png")
+        save_visualization(plt, "missing_data.png")
+
     return missing_summary
 
-# Function to perform correlation analysis
+# Correlation Heatmap
 def analyze_correlation(df):
     numeric_df = df.select_dtypes(include=[np.number])
     if not numeric_df.empty:
-        correlation_matrix = numeric_df.corr()
+        corr_matrix = numeric_df.corr()
         plt.figure(figsize=(12, 8))
-        sns.heatmap(correlation_matrix, annot=True, cmap="coolwarm", fmt=".2f")
-        plt.title("Correlation Heatmap")
-        visualization(plt, "correlation_heatmap.png")
-        return correlation_matrix
+        sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", fmt=".2f")
+        save_visualization(plt, "correlation_heatmap.png")
+        return corr_matrix
     return None
 
-# Function to detect outliers
+# Outlier Detection
 def detect_outliers(df):
     numerical_cols = df.select_dtypes(include=[np.number])
     outlier_summary = {}
@@ -102,75 +103,60 @@ def detect_outliers(df):
         iqr = q3 - q1
         outliers = numerical_cols[(numerical_cols[col] < (q1 - 1.5 * iqr)) | (numerical_cols[col] > (q3 + 1.5 * iqr))]
         outlier_summary[col] = len(outliers)
-        if len(outliers) > 0:
-            plt.figure(figsize=(8, 6))
-            sns.boxplot(data=numerical_cols, y=col)
-            plt.title(f"Outliers in {col}")
-            visualization(plt, f"outliers_{col}.png")
     return outlier_summary
 
-# Function to perform clustering analysis
+# Clustering with Visualization
 def perform_clustering(df):
-    numerical_cols = df.select_dtypes(include=[np.number])
-    if not numerical_cols.empty and len(numerical_cols.columns) >= 2:
-        scores = []
-        for k in range(2, 10):
-            kmeans = KMeans(n_clusters=k, random_state=42).fit(numerical_cols.fillna(0))
-            scores.append(silhouette_score(numerical_cols.fillna(0), kmeans.labels_))
-        optimal_k = scores.index(max(scores)) + 2
-        
-        kmeans = KMeans(n_clusters=optimal_k, random_state=42)
-        df["Cluster"] = kmeans.fit_predict(numerical_cols.fillna(0))
-        
+    numerical_cols = df.select_dtypes(include=[np.number]).dropna()
+    if len(numerical_cols.columns) >= 2:
+        scaler = StandardScaler()
+        scaled_data = scaler.fit_transform(numerical_cols)
+        kmeans = KMeans(n_clusters=3, random_state=42)
+        labels = kmeans.fit_predict(scaled_data)
+        silhouette_avg = silhouette_score(scaled_data, labels)
+
+        # PCA for visualization
+        pca = PCA(n_components=2)
+        pca_data = pca.fit_transform(scaled_data)
+        pca_df = pd.DataFrame(data=pca_data, columns=["PC1", "PC2"])
+        pca_df["Cluster"] = labels
+
         plt.figure(figsize=(10, 6))
-        sns.scatterplot(x=numerical_cols.columns[0], y=numerical_cols.columns[1], hue="Cluster", data=df, palette="viridis")
-        plt.title("Cluster Visualization")
-        visualization(plt, "clusters.png")
-        return df["Cluster"].value_counts()
+        sns.scatterplot(x="PC1", y="PC2", hue="Cluster", data=pca_df, palette="viridis", s=100)
+        plt.title(f"KMeans Clustering (Silhouette Score: {silhouette_avg:.2f})")
+        save_visualization(plt, "clustering.png")
+        return silhouette_avg
     return None
 
-# Function to generate the README file using LLM
-def generate_readme(df, missing_summary, correlation_matrix, outlier_summary, clustering_summary):
-    analysis_context = f"""
-    Dataset Overview:
-    - Rows: {df.shape[0]}
-    - Columns: {df.shape[1]}
-    - Columns List: {', '.join(df.columns)}
-
-    Missing Data:
-    {missing_summary.to_string() if not missing_summary.empty else "No missing data."}
-
-    Correlation Matrix:
-    {correlation_matrix.to_string() if correlation_matrix is not None else "No numeric data for correlation."}
-
-    Outliers:
-    {outlier_summary}
-
-    Clustering Summary:
-    {clustering_summary}
+# Generate README
+def generate_readme(df, missing_summary, corr_matrix, outlier_summary, clustering_score):
+    context = f"""
+    Dataset has {df.shape[0]} rows and {df.shape[1]} columns.
+    Missing Data: {missing_summary.to_string() if not missing_summary.empty else "None"}
+    Correlation Analysis: {'Performed' if corr_matrix is not None else 'Not available (No numeric columns)'}
+    Outliers Detected: {outlier_summary}
+    Clustering Silhouette Score: {clustering_score if clustering_score is not None else "Not performed"}
     """
-    story = ask_llm("Generate a detailed story based on dataset analysis.", analysis_context)
-    try:
-        with open(os.path.join(CONFIG["OUTPUT_DIR"], "README.md"), "w") as f:
-            f.write("# Data Analysis Report\n\n")
-            f.write(f"## Dataset Overview\n{analysis_context}\n")
-            f.write("## Insights\n")
-            f.write(story)
-        print("README.md generated successfully.")
-    except Exception as e:
-        print(f"Error creating README.md file: {e}")
+    story = ask_llm("Generate a summary and narrative based on the dataset insights.", context)
+    readme_path = os.path.join(CONFIG["OUTPUT_DIR"], "README.md")
 
-# Main function
+    with open(readme_path, "w") as readme_file:
+        readme_file.write("# Data Analysis Report\n\n")
+        readme_file.write("## Summary\n\n")
+        readme_file.write(context + "\n\n")
+        readme_file.write("## Narrative Insights\n\n")
+        readme_file.write(story)
+
+# Main Function
 def analyze_data(file_path):
     try:
         encoding = detect_encoding(file_path)
         df = pd.read_csv(file_path, encoding=encoding)
-        print(f"Dataset loaded: {file_path} with {df.shape[0]} rows and {df.shape[1]} columns.")
         missing_summary = analyze_missing_data(df)
-        correlation_matrix = analyze_correlation(df)
+        corr_matrix = analyze_correlation(df)
         outlier_summary = detect_outliers(df)
-        clustering_summary = perform_clustering(df)
-        generate_readme(df, missing_summary, correlation_matrix, outlier_summary, clustering_summary)
+        clustering_score = perform_clustering(df)
+        generate_readme(df, missing_summary, corr_matrix, outlier_summary, clustering_score)
     except Exception as e:
         print(f"Error analyzing data: {e}")
         sys.exit(1)
