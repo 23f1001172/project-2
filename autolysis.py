@@ -5,6 +5,22 @@
 # author = "23f1001172"
 # dependencies = ["pandas", "numpy", "matplotlib", "seaborn", "scikit-learn", "chardet", "requests", "pillow", "pytesseract"]
 # python_version = ">=3.11"
+# import os
+#import pandas as pd
+#import matplotlib.pyplot as plt
+#import seaborn as sns
+#from sklearn.decomposition import PCA
+#from sklearn.cluster import KMeans
+#from sklearn.linear_model import LinearRegression
+#from sklearn.metrics import silhouette_score, mean_squared_error
+#from sklearn.preprocessing import StandardScaler
+#from PIL import Image
+#import pytesseract
+#import numpy as np
+#import chardet
+#import requests
+#import sys
+#import subprocess
 # --- metadata ---
 
 import os
