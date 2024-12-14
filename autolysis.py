@@ -1,17 +1,11 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = [
-#   "pandas",
-#   "numpy",
-#   "matplotlib",
-#   "seaborn",
-#   "scikit-learn",
-#   "chardet",
-#   "requests",
-# ]
-# usage = "python autolysis.py <dataset1.csv> [<dataset2.csv> ...]"
-# description = "A script to analyze datasets dynamically and generate visualizations, summaries, and insights."
-# ///
+# --- metadata ---
+# script_name = "autolysis.py"
+# version = "1.0"
+# description = "A Python script for analyzing datasets and generating insights, visualizations, and summaries."
+# author = "23f1001172"
+# dependencies = ["pandas", "numpy", "matplotlib", "seaborn", "scikit-learn", "chardet", "requests"]
+# python_version = ">=3.11"
+# --- metadata ---
 
 import os
 import pandas as pd
