@@ -15,6 +15,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 import numpy as np
 import chardet
 import requests
@@ -24,13 +25,11 @@ import sys
 CONFIG = {
     "AI_PROXY_URL": "https://aiproxy.sanand.workers.dev/openai/v1/chat/completions",
     "AIPROXY_TOKEN": os.environ.get("AIPROXY_TOKEN", ""),
-    "OUTPUT_DIR": os.path.join(os.getcwd(), "media"),  # Change here
+    "OUTPUT_DIR": os.path.join(os.getcwd(), "media"),
 }
-
 
 # Ensure the output directory exists
 os.makedirs(CONFIG["OUTPUT_DIR"], exist_ok=True)
-
 
 # Function to interact with LLM via AI Proxy
 def ask_llm(question, context):
@@ -86,8 +85,8 @@ def analyze_correlation(df):
     numeric_df = df.select_dtypes(include=[np.number])
     if not numeric_df.empty:
         correlation_matrix = numeric_df.corr()
-        plt.figure(figsize=(10, 6))
-        sns.heatmap(correlation_matrix, annot=True, cmap="coolwarm")
+        plt.figure(figsize=(12, 8))
+        sns.heatmap(correlation_matrix, annot=True, cmap="coolwarm", fmt=".2f")
         plt.title("Correlation Heatmap")
         visualization(plt, "correlation_heatmap.png")
         return correlation_matrix
@@ -103,14 +102,26 @@ def detect_outliers(df):
         iqr = q3 - q1
         outliers = numerical_cols[(numerical_cols[col] < (q1 - 1.5 * iqr)) | (numerical_cols[col] > (q3 + 1.5 * iqr))]
         outlier_summary[col] = len(outliers)
+        if len(outliers) > 0:
+            plt.figure(figsize=(8, 6))
+            sns.boxplot(data=numerical_cols, y=col)
+            plt.title(f"Outliers in {col}")
+            visualization(plt, f"outliers_{col}.png")
     return outlier_summary
 
 # Function to perform clustering analysis
 def perform_clustering(df):
     numerical_cols = df.select_dtypes(include=[np.number])
     if not numerical_cols.empty and len(numerical_cols.columns) >= 2:
-        kmeans = KMeans(n_clusters=3, random_state=42)
+        scores = []
+        for k in range(2, 10):
+            kmeans = KMeans(n_clusters=k, random_state=42).fit(numerical_cols.fillna(0))
+            scores.append(silhouette_score(numerical_cols.fillna(0), kmeans.labels_))
+        optimal_k = scores.index(max(scores)) + 2
+        
+        kmeans = KMeans(n_clusters=optimal_k, random_state=42)
         df["Cluster"] = kmeans.fit_predict(numerical_cols.fillna(0))
+        
         plt.figure(figsize=(10, 6))
         sns.scatterplot(x=numerical_cols.columns[0], y=numerical_cols.columns[1], hue="Cluster", data=df, palette="viridis")
         plt.title("Cluster Visualization")
@@ -138,7 +149,7 @@ def generate_readme(df, missing_summary, correlation_matrix, outlier_summary, cl
     Clustering Summary:
     {clustering_summary}
     """
-    story = ask_llm("Generate a story based on the dataset analysis.", analysis_context)
+    story = ask_llm("Generate a detailed story based on dataset analysis.", analysis_context)
     try:
         with open(os.path.join(CONFIG["OUTPUT_DIR"], "README.md"), "w") as f:
             f.write("# Data Analysis Report\n\n")
