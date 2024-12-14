@@ -161,7 +161,12 @@ def analyze_data(file_path):
         sys.exit(1)
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python autolysis.py <dataset.csv>")
+    if len(sys.argv) < 2:
+        print("Usage: python autolysis.py <dataset1.csv> [<dataset2.csv>]")
         sys.exit(1)
-    analyze_data(sys.argv[1])
+
+    datasets = sys.argv[1:]
+
+    for dataset in datasets:
+        print(f"Processing dataset: {dataset}")
+        analyze_data(dataset)
